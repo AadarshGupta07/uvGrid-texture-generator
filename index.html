@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UV Grid Texture Generator</title>
+    <style>
+        body {
+            background-color: #121212;
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            color: #e0e0e0;
+            font-family: 'Poppins', sans-serif;
+            overflow: hidden;
+            flex-direction: column;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .preview {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            flex: 3;
+            padding: 20px;
+            background-color: #1f1f1f;
+            border-right: 1px solid #333;
+            border-radius: 10px;
+            margin: 20px;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            flex: 1;
+            padding: 20px;
+            background-color: #1f1f1f;
+            border-radius: 10px;
+            border-right: 1px solid #333;
+            margin: 20px;
+            overflow-y: auto;
+        }
+
+        .controls label {
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .controls input[type="number"],
+        .controls input[type="color"] {
+            width: 100%;
+            padding: 5px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background-color: #333;
+            color: #e0e0e0;
+        }
+
+        .controls button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #3a3f51;
+            color: #fff;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .controls button:hover {
+            background-color: #5a637a;
+        }
+
+        .title {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        canvas {
+            max-width: 100%;
+            max-height: 100%;
+            width: 100%;
+            height: auto;
+        }
+
+        @media (min-width: 768px) {
+            body {
+                flex-direction: row;
+            }
+
+            .container {
+                flex-direction: row;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="preview">
+            <div class="title">UV Grid Texture Generator</div>
+            <canvas id="uvGridCanvas"></canvas>
+            <button onclick="downloadImage()"
+                style="margin-top: 20px; background-color: #3a3f51; border: none; border-radius: 5px; color: #fff; padding: 10px 20px; font-size: 16px; cursor: pointer;">Download
+                Image</button>
+        </div>
+        <div class="controls">
+            <label>
+                Image Size:
+                <input type="number" id="imageSize" value="512" defaultValue="512" min="64" max="2048" step="1"
+                    oninput="validateAndUpdateGrid()">
+            </label>
+            <label>
+                Parent Grid Size:
+                <input type="number" id="mainGridSize" value="2" defaultValue="2" min="1" max="64" step="1"
+                    oninput="validateAndUpdateGrid()">
+            </label>
+            <label>
+                Child Grid Size:
+                <input type="number" id="subGridSize" value="2" defaultValue="2" min="1" max="64" step="1"
+                    oninput="validateAndUpdateGrid()">
+            </label>
+            <label>
+                Cell Color:
+                <input type="color" id="cellColor" value="#4CAF50" defaultValue="#4CAF50" oninput="updateGrid()">
+            </label>
+            <label>
+                Outer Border Color:
+                <input type="color" id="outerBorderColor" value="#FFFFFF" defaultValue="#FFFFFF" oninput="updateGrid()">
+            </label>
+            <label>
+                Outer Border Thickness:
+                <input type="number" id="outerBorderThickness" value="4" defaultValue="4" min="1" max="100" step="1"
+                    oninput="validateAndUpdateGrid()">
+            </label>
+            <label>
+                Outer Border Opacity:
+                <input type="number" id="outerBorderOpacity" value="0.9" defaultValue="0.9" min="0" max="1" step="0.1"
+                    oninput="validateAndUpdateGrid()">
+            </label>
+            <label>
+                Inner Border Color:
+                <input type="color" id="innerBorderColor" value="#FFFFFF" defaultValue="#FFFFFF" oninput="updateGrid()">
+            </label>
+            <label>
+                Inner Border Thickness:
+                <input type="number" id="innerBorderThickness" value="1" defaultValue="1" min="0" max="100" step="1"
+                    oninput="validateAndUpdateGrid()">
+            </label>
+            <label>
+                Inner Border Opacity:
+                <input type="number" id="innerBorderOpacity" value="0.5" defaultValue="0.5" min="0" max="1" step="0.01"
+                    oninput="validateAndUpdateGrid()">
+            </label>
+            <label>
+                Plus Color:
+                <input type="color" id="plusColor" value="#FF0000" defaultValue="#FF0000" oninput="updateGrid()">
+            </label>
+            <label>
+                Plus Thickness:
+                <input type="number" id="plusThickness" value="4" defaultValue="4" min="0" max="100" step="1"
+                    oninput="validateAndUpdateGrid()">
+            </label>
+            <label>
+                Plus Opacity:
+                <input type="number" id="plusOpacity" value="1.0" defaultValue="1.0" min="0" max="1" step="0.01"
+                    oninput="validateAndUpdateGrid()">
+            </label>
+            <label>
+                Plus Size:
+                <input type="number" id="plusSize" value="24" defaultValue="24" min="1" max="100" step="1"
+                    oninput="validateAndUpdateGrid()">
+            </label>
+        </div>
+    </div>
+    <script>
+        class UVGridTexture {
+            constructor(canvasId, config) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext("2d");
+                this.updateConfig(config);
+            }
+
+            updateConfig(config) {
+                this.imageSize = config.imageSize || 512;
+                this.mainGridSize = config.mainGridSize || 2;
+                this.subGridSize = config.subGridSize || 2;
+                this.cellColor = config.cellColor || "#4CAF50";
+                this.outerBorderColor = config.outerBorderColor || "#FFFFFF";
+                this.outerBorderThickness = config.outerBorderThickness || 3;
+                this.outerBorderOpacity = config.outerBorderOpacity || 1.0;
+                this.innerBorderColor = config.innerBorderColor || "rgba(255, 255, 255, 0.5)";
+                this.innerBorderThickness = config.innerBorderThickness || 1;
+                this.innerBorderOpacity = config.innerBorderOpacity || 0.5;
+                this.plusColor = config.plusColor || "#FF0000";
+                this.plusThickness = config.plusThickness || 2;
+                this.plusOpacity = config.plusOpacity || 1.0;
+                this.plusSize = config.plusSize || (this.imageSize / (this.mainGridSize * this.subGridSize)) / 4;
+                this.drawGrid();
+            }
+
+            drawGrid() {
+                this.canvas.width = this.imageSize;
+                this.canvas.height = this.imageSize;
+                const ctx = this.ctx;
+                const imageSize = this.imageSize;
+                const mainGridSize = this.mainGridSize;
+                const subGridSize = this.subGridSize;
+                const totalGridSize = mainGridSize * subGridSize;
+                const mainCellSize = imageSize / mainGridSize;
+                const subCellSize = mainCellSize / subGridSize;
+
+                // Fill the background with black color
+                ctx.fillStyle = "#000000";
+                ctx.fillRect(0, 0, imageSize, imageSize);
+
+                // Fill the cells with the cell color
+                ctx.fillStyle = this.cellColor;
+                for (let i = 0; i < totalGridSize; i++) {
+                    for (let j = 0; j < totalGridSize; j++) {
+                        const x = j * subCellSize;
+                        const y = i * subCellSize;
+                        ctx.fillRect(x, y, subCellSize, subCellSize);
+                    }
+                }
+
+                // Draw the main grid
+                for (let i = 0; i < mainGridSize; i++) {
+                    for (let j = 0; j < mainGridSize; j++) {
+                        const mainX = j * mainCellSize;
+                        const mainY = i * mainCellSize;
+
+                        // Draw the sub-grid
+                        for (let m = 0; m < subGridSize; m++) {
+                            for (let n = 0; n < subGridSize; n++) {
+                                const x = mainX + n * subCellSize;
+                                const y = mainY + m * subCellSize;
+
+                                // Draw the inner border with lighter opacity and thinner line
+                                ctx.strokeStyle = this.innerBorderColor;
+                                ctx.globalAlpha = this.innerBorderOpacity;
+                                ctx.lineWidth = this.innerBorderThickness;
+                                ctx.strokeRect(x, y, subCellSize, subCellSize);
+
+                                // Draw the plus sign at the intersection of the inner grid lines
+                                if (n > 0 && m > 0) {
+                                    const plusX = x;
+                                    const plusY = y;
+                                    ctx.strokeStyle = this.plusColor;
+                                    ctx.globalAlpha = this.plusOpacity;
+                                    ctx.lineWidth = this.plusThickness;
+                                    ctx.beginPath();
+                                    ctx.moveTo(plusX - this.plusSize / 2, plusY);
+                                    ctx.lineTo(plusX + this.plusSize / 2, plusY);
+                                    ctx.moveTo(plusX, plusY - this.plusSize / 2);
+                                    ctx.lineTo(plusX, plusY + this.plusSize / 2);
+                                    ctx.stroke();
+                                }
+                            }
+                        }
+
+                        // Draw the border of the main cell
+                        ctx.strokeStyle = this.outerBorderColor;
+                        ctx.globalAlpha = this.outerBorderOpacity;
+                        ctx.lineWidth = this.outerBorderThickness;
+                        ctx.strokeRect(mainX, mainY, mainCellSize, mainCellSize);
+                    }
+                }
+                ctx.globalAlpha = 1.0; // Reset alpha to default
+            }
+        }
+
+        const config = {
+            imageSize: 512,
+            mainGridSize: 2,
+            subGridSize: 2,
+            cellColor: "#4CAF50",
+            outerBorderColor: "#FFFFFF",
+            outerBorderThickness: 4,
+            outerBorderOpacity: 0.9,
+            innerBorderColor: "rgba(255, 255, 255, 0.5)",
+            innerBorderThickness: 1,
+            innerBorderOpacity: 0.5,
+            plusColor: "#FF0000",
+            plusThickness: 4,
+            plusOpacity: 1.0,
+            plusSize: 24
+        };
+
+        const uvGridTexture = new UVGridTexture("uvGridCanvas", config);
+
+        function validateAndUpdateGrid() {
+
+            const mainGridSize = document.getElementById("mainGridSize");
+            mainGridSize.value = Math.min(Math.max(mainGridSize.value, 0), 64);
+
+            const subGridSize = document.getElementById("subGridSize");
+            subGridSize.value = Math.min(Math.max(subGridSize.value, 0), 64);
+
+            const outerBorderThickness = document.getElementById("outerBorderThickness");
+            outerBorderThickness.value = Math.min(Math.max(outerBorderThickness.value, 0), 100);
+
+
+            const innerBorderThickness = document.getElementById("innerBorderThickness");
+            innerBorderThickness.value = Math.min(Math.max(innerBorderThickness.value, 0), 100);
+
+            const innerBorderOpacity = document.getElementById("innerBorderOpacity");
+            innerBorderOpacity.value = Math.min(Math.max(innerBorderOpacity.value, 0), 1);
+
+            const plusThickness = document.getElementById("plusThickness");
+            plusThickness.value = Math.min(Math.max(plusThickness.value, 0), 100);
+
+            const plusOpacity = document.getElementById("plusOpacity");
+            plusOpacity.value = Math.min(Math.max(plusOpacity.value, 0), 1);
+
+            const plusSize = document.getElementById("plusSize");
+            plusSize.value = Math.min(Math.max(plusSize.value, 0), 100);
+
+            updateGrid();
+        }
+
+        function updateGrid() {
+            const imageSize = parseInt(document.getElementById("imageSize").value);
+            const mainGridSize = parseInt(document.getElementById("mainGridSize").value);
+            const subGridSize = parseInt(document.getElementById("subGridSize").value);
+
+            const newConfig = {
+                imageSize: imageSize,
+                mainGridSize: mainGridSize,
+                subGridSize: subGridSize,
+                cellColor: document.getElementById("cellColor").value,
+                outerBorderColor: document.getElementById("outerBorderColor").value,
+                outerBorderThickness: parseInt(document.getElementById("outerBorderThickness").value),
+                outerBorderOpacity: parseFloat(document.getElementById("outerBorderOpacity").value),
+                innerBorderColor: document.getElementById("innerBorderColor").value,
+                innerBorderThickness: parseInt(document.getElementById("innerBorderThickness").value),
+                innerBorderOpacity: parseFloat(document.getElementById("innerBorderOpacity").value),
+                plusColor: document.getElementById("plusColor").value,
+                plusThickness: parseInt(document.getElementById("plusThickness").value),
+                plusOpacity: parseFloat(document.getElementById("plusOpacity").value),
+                plusSize: parseInt(document.getElementById("plusSize").value)
+            };
+
+            // Adjust other parameters based on image size
+            newConfig.outerBorderThickness = Math.min(newConfig.outerBorderThickness, imageSize / 10);
+            newConfig.innerBorderThickness = Math.min(newConfig.innerBorderThickness, imageSize / 20);
+            newConfig.plusThickness = Math.min(newConfig.plusThickness, imageSize / 20);
+            newConfig.plusSize = Math.min(newConfig.plusSize, imageSize / 10);
+
+            uvGridTexture.updateConfig(newConfig);
+        }
+
+        function downloadImage() {
+            const link = document.createElement("a");
+            link.download = "uv_grid_texture.png";
+            link.href = uvGridTexture.canvas.toDataURL();
+            link.click();
+        }
+
+        window.addEventListener('resize', () => {
+            const canvas = document.getElementById('uvGridCanvas');
+            const maxSize = 512;
+            const minSize = 128;
+            const size = Math.max(minSize, Math.min(maxSize, window.innerWidth - 40)); // 40 for margins
+            canvas.style.width = `${size}px`;
+            canvas.style.height = `${size}px`;
+        });
+
+        window.dispatchEvent(new Event('resize')); // Initial resize to set canvas size
+    </script>
+</body>
+
+</html>
